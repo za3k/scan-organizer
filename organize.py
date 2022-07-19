@@ -186,7 +186,7 @@ class Organizer():
                     correct_category = category
         return correct_category
 
-    # Common button actions
+    # Common (model-level) buttons
     def next(self, phase, image):
         print("next")
         _, _, images, _ = self.phase_info(phase)
@@ -230,3 +230,19 @@ class Organizer():
                 if len(work_images) == 0:
                     phase.set_done(True, popup=True)
                     self.autoselect_phase()
+
+    # UI-level butons
+    def set_category(self, phase, image):
+        print("set_category")
+        category = phase.get_category()
+        image.set_category(category)
+
+    def set_name(self, phase, image):
+        print("set_name")
+        name = phase.get_name()
+        image.rename(name)
+
+    def save_transcription(self, phase, image):
+        print("save_transcription")
+        image.transcription = phase.get_transcription()
+

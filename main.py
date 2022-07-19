@@ -99,7 +99,7 @@ class ScanOrganizer(Organizer):
         done = subprocess.run(command)
         return done.returncode == 0
 
-    # Button actions
+    # Application-specific buttons
     def rotate_left(self, _, image):
         print("rotate_left")
         self._run(["convert", image.image_path, "-rotate", "270", image.image_path])
@@ -117,20 +117,6 @@ class ScanOrganizer(Organizer):
             new_path = image.image_path.parent.joinpath("{}-crop{}".format(image.image_path.stem, image.image_path.suffix))
             os.rename(new_path, image.image_path)
             self.reload_image(image)
-
-    def set_category(self, phase, image):
-        print("set_category")
-        category = phase.get_category()
-        image.set_category(category)
-
-    def set_name(self, phase, image):
-        print("set_name")
-        name = phase.get_name()
-        image.rename(name)
-
-    def save_transcription(self, phase, image):
-        print("save_transcription")
-        image.transcription = phase.get_transcription()
 
 
 if __name__ == "__main__":
