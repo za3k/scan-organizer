@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+import os
+import pathlib
+import subprocess
+import sys
+
+import natsort
+
+from organize import Organizer
+from ui import Extras
+
+
+class ScanOrganizer(Organizer):
+    """
+    Phase 1 [-cleaned]: Clean up pictures. +cleaned
+    Phase 2 [-categorized]: Categorize pictures (sort into folders). +categorized
+    Phase 3 [-named +categorized]: Name files. +named
+    Phase 4 [-hand_transcribe -computer_transcribe -no_text]: Tag files as needing transcription.
+    Phase 5 [+hand_transcribe -transcribed]: Transcribe files by hand. +transcribed
+    Phase 6 ["-verified"]: Verify finished files. Relies on the human to do this last. +verified
+    """
+    def __init__(self, new_category_root):
+        super().__init__(new_category_root)
+
+        self.add_phase(
+            name="Phase ^1: Clean",
+            tags=["-cleaned"],
+            extras=[],
+            buttons={
+                "Skip Prev (←)": self.prev,
+                "Skip Next (→)": self.next,
+                "Rotate left (<)": self.rotate_left,
+                "Rotate right (>)": self.rotate_right,
+                "Crop (c)": self.crop,
+                "Done (n)": self.tag("+cleaned"),
+            },
+        )
+        self.add_phase(
+            name="Phase ^2: Categorize",
+            tags=["-categorized"],
+            extras=[Extras.CATEGORY_PICKER],
+            buttons={
+                "Skip Prev (←)": self.prev,
+                "Skip Next (→)": self.next,
+                "Categorize (n)": [self.save_category, self.tag("+categorized")],
+            },
+        )
+        self.add_phase(
+            name="Phase ^3: Renaming",
+            tags=["-named","+categorized"],
+            extras=[Extras.RENAME, Extras.SHOW_CATEGORY],
+            buttons={
+                "Skip Prev (←)": self.prev,
+                "Skip Next (→)": self.next,
+                "Rename (n)": [self.save_name, self.tag("+named")],
+            },
+        )
+        self.add_phase(
+            name="Phase ^4: Tagging",
+            tags=["-hand_transcribe", "-computer_transcribe", "-no_text", "-text_elsewhere"],
+            extras=[],
+            buttons={
+                "Skip Prev (←)": self.prev,
+                "Skip Next (→)": self.next,
+                "No text (0)": self.tag("+no_text"),
+                "Very short (s) ": self.tag("+hand_transcribe"),
+                "Handwritten text (h)": self.tag("+hand_transcribe"),
+                "Computer font (c)": self.tag("+computer_transcribe"),
+                "Text stored elsewhere (e)": self.tag("+text_elsewhere"),
+            },
+        )
+        self.add_phase(
+            name="Phase ^5: Transcription",
+            tags=["+hand_transcribe", "-transcribed"],
+            extras=[Extras.TRANSCRIBE],
+            buttons={
+                "Skip Prev (←)": self.prev,
+                "Skip Next (→)": self.next,
+                "Transcribed (n/⇧⏎/C-n)": [self.save_transcription, self.tag("+transcribed")],
+            },
+        )
+        # TODO: Computer transcription and hand-correction
+        self.add_phase(
+            name="Phase ^6: Verification",
+            tags=["-verified"],
+            extras=[Extras.METADATA_DISPLAY],
+            buttons={
+                "Skip Prev (←)": self.prev,
+                "Skip Next (→)": self.next,
+                "Looks Good (n)": self.tag("+verified"),
+            },
+        )
+
+    def load_master(self, master):
+        files = []
+        dirs = [master]
+        for p in dirs:
+            assert p.is_dir()
+            for x in p.iterdir():
+                if x.is_file():
+                    files.append(x)
+                elif x.is_dir():
+                    dirs.append(x)
+
+        for category in natsort.natsorted(dirs):
+            if category == master:
+                continue
+            organizer.add_category(category, str(category.relative_to(master)))
+        for file in natsort.natsorted(files):
+            if file.suffix in {".png", ".jpg", ".jpeg", ".tiff", ".tif", ".gif"}:
+                organizer.add_image(file)
+        organizer.autoselect_phase()
+
+    def _run(self, command):
+        """Run an external command"""
+        done = subprocess.run(command)
+        return done.returncode == 0
+
+    # Application-specific buttons
+    def rotate_left(self, _, image):
+        self._run(["convert", image.image_path, "-rotate", "270", image.image_path])
+        self.reload_image(image)
+
+    def rotate_right(self, _, image):
+        self._run(["convert", image.image_path, "-rotate", "90", image.image_path])
+        self.reload_image(image)
+
+    def crop(self, _, image):
+        success = self._run(["cropgui", image.image_path]) # Only works on jpg
+        if success:
+            new_path = image.image_path.parent.joinpath("{}-crop{}".format(image.image_path.stem, image.image_path.suffix))
+            os.rename(new_path, image.image_path)
+            self.reload_image(image)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 1:
+        master = pathlib.Path(os.getcwd())
+    elif len(sys.argv) == 2:
+        master = pathlib.Path(sys.argv[1])
+    else:
+        print("Too many paths"); sys.exit(1)
+    if not master.is_dir():
+        print("Path must be a directory: ", master); sys.exit(1)
+
+    organizer = ScanOrganizer(master)
+    organizer.load_master(master)
+    organizer.display()
