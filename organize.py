@@ -5,6 +5,11 @@ import os
 import frontmatter
 
 import ui
+from ui import Extras
+
+
+class SaveInvalidError(ui.ButtonActionInvalidError):
+    pass
 
 
 class OrganizerCategory():
@@ -31,6 +36,10 @@ class OrganizerImage():
     def set_category(self, category):
         self.category = category
         self._move(category.path.joinpath(self.image_path.name))
+
+    @property
+    def metadata_string(self):
+        return frontmatter.dumps(self.textfm)
 
     @property
     def transcription(self):
@@ -76,6 +85,7 @@ class OrganizerImage():
         old_image_path, self.image_path = self.image_path, new_path
         old_transcription_path, self.transcription_path = self.transcription_path, self._transcription_path(self.image_path)
 
+        # TODO: Avoid clobbering a second file of the same name
         os.rename(old_image_path, self.image_path)
         #if old_transcription_path.exists():
         os.rename(old_transcription_path, self.transcription_path)
@@ -124,7 +134,7 @@ class Organizer():
                 work_images.append(image.index)
                 phase.increment_todo(1)
                 if phase_index is None:
-                    self.set_image(phase, 0)
+                    self.set_image(phase, image.index)
             else:
                 phase.increment_skipped(1)
 
@@ -147,16 +157,20 @@ class Organizer():
         """Use if the selected image changed for a phase"""
         self.set_phase_index(phase, new_index)
         tags, phase_index, images, work_images = self.phase_info(phase)
-        if len(images) == 0:
+        if len(images) == 0 or new_index is None:
             assert new_index is None
+            phase.set_image(None, False, [])
             phase.set_done(True)
-            phase.set_image(None, False)
         else:
             assert new_index is not None
             phase.set_done(False)
             assert phase_index in images
             image = self.images[phase_index]
-            phase.set_image(image, phase_index in work_images)
+            phase.set_image(
+                image,
+                is_work=phase_index in work_images,
+                categories=self.categories,
+            )
 
     def reload_image(self, image):
         """Use if we think an image was changed externally"""
@@ -186,40 +200,42 @@ class Organizer():
                     correct_category = category
         return correct_category
 
+
     # Common (model-level) buttons
     def next(self, phase, image):
-        print("next")
         _, _, images, _ = self.phase_info(phase)
         return self._switch_index(phase, 1, images)
 
     def prev(self, phase, image):
-        print("prev")
         _, _, images, _ = self.phase_info(phase)
         return self._switch_index(phase, -1, images)
 
     def next_work(self, phase, image):
-        print("next_work")
         _, _, _, work_images = self.phase_info(phase)
         return self._switch_index(phase, 1, work_images)
 
     def prev_work(self, phase, image):
-        print("prev_work")
         _, _, _, work_images = self.phase_info(phase)
         return self._switch_index(phase, -1, work_images)
 
     def tag(self, tag, phase, image):
-        print("tag", tag)
         before = { phase: image.match_tags(tags) for phase, tags, _, _, _ in self.phases() }
         image.tag(tag)
         after  = { phase: image.match_tags(tags) for phase, tags, _, _, _ in self.phases() }
         for phase, tags, phase_index, images, work_images in self.phases():
             if before[phase] == False and after[phase] == True:
                 # Added to phase
-                work_images.append(image.index)
-                phase.increment_todo(1)
-                phase.increment_skipped(-1) # Usually it's skipped and not finished, but this is a guess
+                assert image.index not in work_images
+                if image.index not in work_images:
+                    work_images.append(image.index)
+                    phase.increment_todo(1)
+                    if image.index not in images:
+                        images.append(image.index)
+                        phase.increment_skipped(-1)
+                    else:
+                        phase.increment_finished(-1)
                 if len(work_images) == 1: # New first image
-                    self.set_image(phase, 0)
+                    self.set_image(phase, image.index)
             elif before[phase] == True and after[phase] == False:
                 # Removed from phase.
                 phase.increment_todo(-1)
@@ -228,21 +244,27 @@ class Organizer():
                     self.next_work(phase, image)
                 work_images.remove(image.index)
                 if len(work_images) == 0:
+                    self.set_image(phase, None)
                     phase.set_done(True, popup=True)
                     self.autoselect_phase()
 
-    # UI-level butons
-    def set_category(self, phase, image):
-        print("set_category")
-        category = phase.get_category()
+
+    # Default extras (UI-level) buttons
+    def save_category(self, phase, image):
+        category_name = phase.get_extra(Extras.CATEGORY_PICKER).get_category_name()
+        if category_name is None:
+            raise SaveInvalidError("category not set")
+        category = [category for category in self.categories if category.name == category_name][0]
         image.set_category(category)
 
-    def set_name(self, phase, image):
-        print("set_name")
-        name = phase.get_name()
+    def save_name(self, phase, image):
+        name = phase.get_extra(Extras.RENAME).get_name()
+        if name is None or name.strip() == "":
+            raise SaveInvalidError("name not set")
         image.rename(name)
 
     def save_transcription(self, phase, image):
-        print("save_transcription")
-        image.transcription = phase.get_transcription()
-
+        transcription = phase.get_extra(Extras.TRANSCRIBE).get_transcription()
+        if transcription is None or transcription.strip() == "":
+            raise SaveInvalidError("transcription not set")
+        image.transcription = transcription

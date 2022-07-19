@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 from organize import Organizer
+from ui import Extras
 
 
 class ScanOrganizer(Organizer):
@@ -19,6 +20,7 @@ class ScanOrganizer(Organizer):
     def __init__(self):
         super().__init__()
 
+        # TODO: Keyboard shortcuts
         self.add_phase(
             name="Phase 1: Clean",
             tags=["-cleaned"],
@@ -35,19 +37,21 @@ class ScanOrganizer(Organizer):
         self.add_phase(
             name="Phase 2: Categorize",
             tags=["-categorized"],
-            extras=["categories"],
+            extras=[Extras.CATEGORY_PICKER],
             buttons={
                 "Skip Prev": self.prev,
                 "Skip Next": self.next,
-                "Categorize": [self.set_category, functools.partial(self.tag, "+categorized")],
+                "Categorize": [self.save_category, functools.partial(self.tag, "+categorized")],
             },
         )
         self.add_phase(
             name="Phase 3: Renaming",
             tags=["-named","+categorized"],
-            extras=["rename", "current_category"],
+            extras=[Extras.RENAME, Extras.SHOW_CATEGORY],
             buttons={
-                "Rename": [self.set_name, functools.partial(self.tag, "+named")],
+                "Skip Prev": self.prev,
+                "Skip Next": self.next,
+                "Rename": [self.save_name, functools.partial(self.tag, "+named")],
             },
         )
         self.add_phase(
@@ -55,23 +59,34 @@ class ScanOrganizer(Organizer):
             tags=["-hand_transcribe", "-computer_transcribe", "-no_text", "-text_elsewhere"],
             extras=[],
             buttons={
+                "Skip Prev": self.prev,
+                "Skip Next": self.next,
                 "No text": [functools.partial(self.tag, "+no_text")],
                 "Very short": [functools.partial(self.tag, "+hand_transcribe")],
                 "Handwritten text": [functools.partial(self.tag, "+hand_transcribe")],
                 "Computer font": [functools.partial(self.tag, "+computer_transcribe")],
                 "Text stored elsewhere": [functools.partial(self.tag, "+text_elsewhere")],
-                "Skip Prev": self.prev,
-                "Skip Next": self.next,
             },
         )
         self.add_phase(
             name="Phase 5: Transcription",
             tags=["+hand_transcribe", "-transcribed"],
-            extras=["transcribe"],
+            extras=[Extras.TRANSCRIBE],
             buttons={
                 "Skip Prev": self.prev,
                 "Skip Next": self.next,
                 "Transcribed": [self.save_transcription, functools.partial(self.tag, "+transcribed")],
+            },
+        )
+        # TODO: Computer transcription and hand-correction
+        self.add_phase(
+            name="Phase 6: Verification",
+            tags=["-verified"],
+            extras=[Extras.METADATA_DISPLAY],
+            buttons={
+                "Skip Prev": self.prev,
+                "Skip Next": self.next,
+                "Looks Good": [functools.partial(self.tag, "+verified")],
             },
         )
 
@@ -87,6 +102,8 @@ class ScanOrganizer(Organizer):
                     dirs.append(x)
 
         for category in dirs:
+            if category == master:
+                continue
             organizer.add_category(category, str(category.relative_to(master)))
         # TODO: natsort filenames and categories. how to deal with file renames?
         for file in files:
@@ -101,17 +118,14 @@ class ScanOrganizer(Organizer):
 
     # Application-specific buttons
     def rotate_left(self, _, image):
-        print("rotate_left")
         self._run(["convert", image.image_path, "-rotate", "270", image.image_path])
         self.reload_image(image)
 
     def rotate_right(self, _, image):
-        print("rotate_right")
         self._run(["convert", image.image_path, "-rotate", "90", image.image_path])
         self.reload_image(image)
 
     def crop(self, _, image):
-        print("crop")
         success = self._run(["cropgui", image.image_path]) # Only works on jpg
         if success:
             new_path = image.image_path.parent.joinpath("{}-crop{}".format(image.image_path.stem, image.image_path.suffix))
