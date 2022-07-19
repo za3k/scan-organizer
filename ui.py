@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-#TODO: Buttons to finish should maybe be greyed out if you can't do it
 import enum
 import functools
 
+import natsort
 import PIL
 import PIL.Image
 import PIL.ImageTk
@@ -86,7 +86,7 @@ class TranscriptionWindow(tk.Tk):
 
 
 class TranscriptionPhase(tk.Frame):
-    def __init__(self, root, name, extras, buttons):
+    def __init__(self, root, name, extras, buttons, on_create_category):
         super().__init__(root)
         self.id = name
         self.image = None
@@ -161,7 +161,7 @@ class TranscriptionPhase(tk.Frame):
         self.extras_frame.grid_rowconfigure(1, weight=1)
         for i, extra_request in enumerate(extras):
             if extra_request == Extras.CATEGORY_PICKER:
-                extra = ExtraCategoryPicker(self.extras_frame)
+                extra = ExtraCategoryPicker(self.extras_frame, on_create_category)
             elif extra_request == Extras.METADATA_DISPLAY:
                 extra = ExtraMetadataDisplay(self.extras_frame)
             elif extra_request == Extras.SHOW_CATEGORY:
@@ -192,7 +192,7 @@ class TranscriptionPhase(tk.Frame):
             try:
                 action(self, self.current_image)
             except ButtonActionInvalidError as e:
-                print("cancelling action because: {}".format(e.message))
+                tkmessagebox.showinfo(message=e.message)
                 return
 
     def __hash__(self):
@@ -202,6 +202,7 @@ class TranscriptionPhase(tk.Frame):
         return self.extras.get(e, Ignorer()) # Magic so we don't have to check for None
 
     def set_image(self, image, is_work, categories):
+        # TODO: For later phases, often changes get made but when you switch to that tab, they are not yet reflected for the first one.
         self.current_image = image
         if self.current_image is None:
             self.sv_current_image_path.set("Complete")
@@ -257,29 +258,79 @@ class ExtraCategoryPicker(tk.Frame, Extra):
 
     Displays a list of possible categories, and allows selecting one.
     Allows making a new category.
-    TODO (move to show category): If a category is selected, displays information about that category.
+    If a category is selected, displays information about that category.
 
     Does not save choice automatically.
     """
-    # TODO: Show contents of category and preview of those files
-    # TODO: Allow adding categories
-    def __init__(self, root):
+    def __init__(self, root, category_creator):
         super().__init__(root)
 
         self.choices = tk.StringVar(value=[])
+        self.filenames = tk.StringVar(value=[])
+        self.sv_new_category = tk.StringVar(value="")
+        self._categories = []
+        self.category_creator = category_creator
+        assert category_creator is not None
 
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
         self.listbox = tk.Listbox(self, listvariable=self.choices)
-        self.listbox.grid(column=1, row=1)
+        self.listbox.grid(column=1, row=1, columnspan=2, sticky=tk.W+tk.N+tk.E+tk.S)
+        self.listbox2 = tk.Listbox(self, listvariable=self.filenames, state=tk.DISABLED)
+        self.listbox2.grid(column=3, row=1, sticky=tk.W+tk.N+tk.E+tk.S)
+        self.listbox.bind("<<ListboxSelect>>", self.on_selection_change)
+        self.category_name = tk.Entry(self, textvariable=self.sv_new_category)
+        self.category_name.grid(column=1, row=2)
+        self.add_category_button = tk.Button(self, text="Add New")
+        self.add_category_button.grid(column=2, row=2)
+        self.add_category_button.bind("<Button-1>", self.on_create_category)
 
     def set_category(self, category, categories):
-        self.choices.set([category.name for category in categories])
+        _categories = natsort.natsorted([(category.name, category) for category in categories])
+        self._categories = [x[1] for x in _categories]
+        self.choices.set([x[0] for x in _categories])
+
+        self.listbox.select_clear(0, "end")
+        if category is not None:
+            index = self._categories.index(category)
+            self.listbox.selection_set((index,))
+        self.on_category_changed()
 
     def get_category_name(self):
         if len(self.listbox.curselection()) == 1:
             return self.listbox.get(self.listbox.curselection())
+
+    def on_selection_change(self, event):
+        self.on_category_changed()
+
+    def on_category_changed(self):
+        self.listbox2.select_clear(0, "end")
+        selected_category = self.selected_category
+        # If the category is unset, don't reset the textbox
+        if selected_category is not None:
+            filenames = [file.name for file in selected_category.path.iterdir() if file.suffix != ".txt"]
+            self.filenames.set(natsort.natsorted(filenames))
+            self.sv_new_category.set(selected_category.name)
+
+    @property
+    def selected_category(self):
+        if len(self.listbox.curselection()) == 1:
+            selected_index, = self.listbox.curselection()
+            return self._categories[selected_index]
+
+    def on_create_category(self, event):
+        category_name = self.sv_new_category.get().strip()
+        if category_name == "":
+            tkmessagebox.showinfo(message="You must type a category name")
+            return
+        try:
+            new_category, categories = self.category_creator(category_name)
+            self.set_category(new_category, categories)
+        except ButtonActionInvalidError as e:
+            tkmessagebox.showinfo(message=e.message)
+
+
 
 class ExtraMetadataDisplay(tk.Text, Extra):
     """Display the metadata for the current image without allowing editing"""
@@ -294,19 +345,28 @@ class ExtraMetadataDisplay(tk.Text, Extra):
         self.config(state=tk.DISABLED)
 
 
-# TODO
 class ExtraShowCategory(tk.Frame, Extra):
     """Display the current category and files in it"""
     def __init__(self, root):
         super().__init__(root)
-        #self.category_menu = tk.OptionMenu(self.transcription_frame, value="A", variable=self.sv_category_name)
-        #self.category_menu.grid(column=2, row=1)
+        self.rowconfigure(2, weight=1)
+        self.filenames = tk.StringVar(value=[])
+        self.sv_category = tk.StringVar(value="Loading...")
+        self.label = tk.Label(self, textvariable=self.sv_category)
+        self.listbox = tk.Listbox(self, listvariable=self.filenames, state=tk.DISABLED)
+        self.label.grid(column=1, row=1, sticky=tk.W+tk.E)
+        self.listbox.grid(column=1, row=2, sticky=tk.W+tk.N+tk.E+tk.S)
 
     def set_category(self, category):
-        pass
+        self.sv_category.set(category.name if category is not None else "")
+
+        self.listbox.select_clear(0, "end")
+        if category is not None:
+            filenames = [file.name for file in category.path.iterdir() if file.suffix != ".txt"]
+            self.filenames.set(natsort.natsorted(filenames))
 
 
-class ExtraRename(tk.Entry, Extra):
+class ExtraRename(tk.Frame, Extra):
     """Image rename text box
 
     Loaded with existing name to start.
@@ -316,15 +376,21 @@ class ExtraRename(tk.Entry, Extra):
     def __init__(self, root):
         super().__init__(root)
 
-    def get_sticky(self):
-        return tk.W+tk.E
+        self.label = tk.Label(self, text="Filename")
+        self.textbox = tk.Entry(self)
+
+        # Center the label and textbox without stretching them vertically
+        self.grid_rowconfigure(1, weight=1)
+        #self.grid_rowconfigure(4, weight=1) # Wait actually put them on the bottom
+        self.label.grid(column=1, row=2, sticky=tk.W+tk.E)
+        self.textbox.grid(column=1, row=3, sticky=tk.W+tk.E)
 
     def set_name(self, name):
-        self.delete(0, tk.END)
-        self.insert(0, name)
+        self.textbox.delete(0, tk.END)
+        self.textbox.insert(0, name)
 
     def get_name(self):
-        return self.get()
+        return self.textbox.get()
 
 
 class ExtraTranscribe(tk.Text, Extra):

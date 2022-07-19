@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import collections
+import functools
 import os
 
 import frontmatter
@@ -10,6 +11,11 @@ from ui import Extras
 
 class SaveInvalidError(ui.ButtonActionInvalidError):
     pass
+
+
+class ImageClobberingError(ui.ButtonActionInvalidError):
+    def __init__(self):
+        super().__init__("Image already exists")
 
 
 class OrganizerCategory():
@@ -82,20 +88,24 @@ class OrganizerImage():
         frontmatter.dump(self.textfm, self.transcription_path)
 
     def _move(self, new_path):
+        if new_path == self.image_path:
+            return
+        if new_path.exists():
+            raise ImageClobberingError()
         old_image_path, self.image_path = self.image_path, new_path
         old_transcription_path, self.transcription_path = self.transcription_path, self._transcription_path(self.image_path)
 
-        # TODO: Avoid clobbering a second file of the same name
         os.rename(old_image_path, self.image_path)
-        #if old_transcription_path.exists():
-        os.rename(old_transcription_path, self.transcription_path)
+        if old_transcription_path.exists():
+            os.rename(old_transcription_path, self.transcription_path)
 
     def _transcription_path(self, image_path):
         return image_path.parent.joinpath(image_path.stem + ".txt")
 
 class Organizer():
-    def __init__(self):
+    def __init__(self, new_category_root):
         self.window = ui.TranscriptionWindow()
+        self.new_category_root = new_category_root
         self.images = []
         self.categories = []
         self._phases = []
@@ -109,7 +119,7 @@ class Organizer():
         self._phase_index = collections.defaultdict(lambda: None)
 
     def add_phase(self, tags, **kwargs):
-        phase = self.window.add_phase(**kwargs)
+        phase = self.window.add_phase(on_create_category=self.on_create_category, **kwargs)
         self._phases.append(phase)
         self._phase_tags[phase] = tags
         # Images are always added after phases, so skip iterating over existing images
@@ -200,6 +210,16 @@ class Organizer():
                     correct_category = category
         return correct_category
 
+    def on_create_category(self, category_name):
+        category_path = self.new_category_root.joinpath(category_name)
+        category = OrganizerCategory(category_path, category_name)
+        try:
+            os.makedirs(category_path)
+        except FileExistsError:
+            raise ui.ButtonActionInvalidError("That category already exists")
+        self.categories.append(category)
+        return category, self.categories
+
 
     # Common (model-level) buttons
     def next(self, phase, image):
@@ -218,7 +238,10 @@ class Organizer():
         _, _, _, work_images = self.phase_info(phase)
         return self._switch_index(phase, -1, work_images)
 
-    def tag(self, tag, phase, image):
+    def tag(self, tag): # A button's action should be self.tag("+some_tag")
+        return lambda phase, image: self._tag(tag, phase, image) 
+
+    def _tag(self, tag, phase, image):
         before = { phase: image.match_tags(tags) for phase, tags, _, _, _ in self.phases() }
         image.tag(tag)
         after  = { phase: image.match_tags(tags) for phase, tags, _, _, _ in self.phases() }
@@ -253,18 +276,18 @@ class Organizer():
     def save_category(self, phase, image):
         category_name = phase.get_extra(Extras.CATEGORY_PICKER).get_category_name()
         if category_name is None:
-            raise SaveInvalidError("category not set")
+            raise SaveInvalidError("Category not selected")
         category = [category for category in self.categories if category.name == category_name][0]
         image.set_category(category)
 
     def save_name(self, phase, image):
         name = phase.get_extra(Extras.RENAME).get_name()
         if name is None or name.strip() == "":
-            raise SaveInvalidError("name not set")
+            raise SaveInvalidError("Enter a filename")
         image.rename(name)
 
     def save_transcription(self, phase, image):
         transcription = phase.get_extra(Extras.TRANSCRIBE).get_transcription()
         if transcription is None or transcription.strip() == "":
-            raise SaveInvalidError("transcription not set")
+            raise SaveInvalidError("Transcription is empty")
         image.transcription = transcription

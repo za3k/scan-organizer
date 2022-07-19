@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-import functools
 import os
 import pathlib
 import subprocess
 import sys
+
+import natsort
 
 from organize import Organizer
 from ui import Extras
@@ -16,9 +17,10 @@ class ScanOrganizer(Organizer):
     Phase 3 [-named +categorized]: Name files. +named
     Phase 4 [-hand_transcribe -computer_transcribe -no_text]: Tag files as needing transcription.
     Phase 5 [+hand_transcribe -transcribed]: Transcribe files by hand. +transcribed
+    Phase 6 ["-verified"]: Verify finished files. Relies on the human to do this last. +verified
     """
-    def __init__(self):
-        super().__init__()
+    def __init__(self, new_category_root):
+        super().__init__(new_category_root)
 
         # TODO: Keyboard shortcuts
         self.add_phase(
@@ -31,7 +33,7 @@ class ScanOrganizer(Organizer):
                 "Crop": self.crop,
                 "Skip Prev": self.prev,
                 "Skip Next": self.next,
-                "Done": functools.partial(self.tag, "+cleaned"),
+                "Done": self.tag("+cleaned"),
             },
         )
         self.add_phase(
@@ -41,7 +43,7 @@ class ScanOrganizer(Organizer):
             buttons={
                 "Skip Prev": self.prev,
                 "Skip Next": self.next,
-                "Categorize": [self.save_category, functools.partial(self.tag, "+categorized")],
+                "Categorize": [self.save_category, self.tag("+categorized")],
             },
         )
         self.add_phase(
@@ -51,7 +53,7 @@ class ScanOrganizer(Organizer):
             buttons={
                 "Skip Prev": self.prev,
                 "Skip Next": self.next,
-                "Rename": [self.save_name, functools.partial(self.tag, "+named")],
+                "Rename": [self.save_name, self.tag("+named")],
             },
         )
         self.add_phase(
@@ -61,11 +63,11 @@ class ScanOrganizer(Organizer):
             buttons={
                 "Skip Prev": self.prev,
                 "Skip Next": self.next,
-                "No text": [functools.partial(self.tag, "+no_text")],
-                "Very short": [functools.partial(self.tag, "+hand_transcribe")],
-                "Handwritten text": [functools.partial(self.tag, "+hand_transcribe")],
-                "Computer font": [functools.partial(self.tag, "+computer_transcribe")],
-                "Text stored elsewhere": [functools.partial(self.tag, "+text_elsewhere")],
+                "No text": self.tag("+no_text"),
+                "Very short": self.tag("+hand_transcribe"),
+                "Handwritten text": self.tag("+hand_transcribe"),
+                "Computer font": self.tag("+computer_transcribe"),
+                "Text stored elsewhere": self.tag("+text_elsewhere"),
             },
         )
         self.add_phase(
@@ -75,7 +77,7 @@ class ScanOrganizer(Organizer):
             buttons={
                 "Skip Prev": self.prev,
                 "Skip Next": self.next,
-                "Transcribed": [self.save_transcription, functools.partial(self.tag, "+transcribed")],
+                "Transcribed": [self.save_transcription, self.tag("+transcribed")],
             },
         )
         # TODO: Computer transcription and hand-correction
@@ -86,7 +88,7 @@ class ScanOrganizer(Organizer):
             buttons={
                 "Skip Prev": self.prev,
                 "Skip Next": self.next,
-                "Looks Good": [functools.partial(self.tag, "+verified")],
+                "Looks Good": self.tag("+verified"),
             },
         )
 
@@ -101,12 +103,11 @@ class ScanOrganizer(Organizer):
                 elif x.is_dir():
                     dirs.append(x)
 
-        for category in dirs:
+        for category in natsort.natsorted(dirs):
             if category == master:
                 continue
             organizer.add_category(category, str(category.relative_to(master)))
-        # TODO: natsort filenames and categories. how to deal with file renames?
-        for file in files:
+        for file in natsort.natsorted(files):
             if file.suffix in {".png", ".jpg", ".jpeg", ".tiff", ".tif", ".gif"}:
                 organizer.add_image(file)
         organizer.autoselect_phase()
@@ -143,6 +144,6 @@ if __name__ == "__main__":
     if not master.is_dir():
         print("Path must be a directory: ", master); sys.exit(1)
 
-    organizer = ScanOrganizer()
+    organizer = ScanOrganizer(master)
     organizer.load_master(master)
     organizer.display()
