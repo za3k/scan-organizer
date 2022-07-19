@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
+import functools
+import os
+import pathlib
+import subprocess
+import sys
 
-import functools, os, pathlib, subprocess, sys
 from organize import Organizer
 
 

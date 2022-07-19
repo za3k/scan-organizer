@@ -1,5 +1,10 @@
+#!/usr/bin/env python3
+import collections
+import os
+
+import frontmatter
+
 import ui
-import collections, frontmatter, os
 
 
 class OrganizerCategory():

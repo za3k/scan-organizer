@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-import functools, os, sys
+import functools
+
+import PIL
+import PIL.Image
+import PIL.ImageTk
 import tkinter as tk
 import tkinter.messagebox as tkmessagebox
 import tkinter.ttk as ttk
-from pathlib import Path
-import natsort
-import PIL, PIL.Image, PIL.ImageTk
 
 class Image(tk.Canvas):
     def __init__(self, parent):
