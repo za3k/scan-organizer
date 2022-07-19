@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import enum
 import functools
+import re
 
 import natsort
 import PIL
@@ -72,17 +73,50 @@ class TranscriptionWindow(tk.Tk):
     def __init__(self, *args, **kw_args): 
         super().__init__(*args, **kw_args)
 
+        self.phases = []
         self.tabControl = ttk.Notebook(self)
         self.tabControl.pack(expand=1, fill="both")
+        self.tabControl.enable_traversal() # Keyboard shortcuts like Control-Tab
+        self.tabControl.bind("<<NotebookTabChanged>>", self.on_tab_change)
+        self.bind_all("<Key>", self.handle_keypress)
 
     def add_phase(self, name, **kw_args):
+        shortcut_index = -1
+        if "^" in name:
+            shortcut_index = name.index("^")
+            name = name.replace("^", "")
         phase = TranscriptionPhase(self.tabControl, name=name, **kw_args)
-        self.tabControl.add(phase, text=name)
+        self.tabControl.add(phase, text=name, underline=shortcut_index)
+        self.phases.append(phase)
         return phase
     
     def select_phase(self, phase):
         index = self.tabControl.tabs().index(str(phase))
         self.tabControl.select(index)
+
+    def on_tab_change(self, event):
+        active_tab = self.tabControl.index("current")
+        phase = self.phases[active_tab]
+        phase.focus_set()
+        phase.refresh()
+
+    def handle_keypress(self, event):
+        excluded = (ExtraTranscribe, tk.Entry,)
+        active_tab = self.tabControl.index("current")
+        phase = self.phases[active_tab]
+        if isinstance(event.widget, excluded) and event.state == 0:
+            return
+        return phase.handle_keypress(event)
+
+    @property
+    def active(self):
+        notebook = self.master
+        return notebook.tab(notebook.index("current"), "text") == self.id
+        if not self.active:
+            return
+        if any(isinstance(event.widget, widget_type) for widget_type in excluded):
+            return
+        return self._handle_button(actions, event)
 
 
 class TranscriptionPhase(tk.Frame):
@@ -180,10 +214,38 @@ class TranscriptionPhase(tk.Frame):
         # | save | left | right | crop | prev | next          |
         # +---------------------------------------------------+
         # self.buttons_frame
+        self.shortcuts = {}
         for i, (label, actions) in enumerate(buttons.items()):
-            button = tk.Button(self.buttons_frame, text=label)
+            m = re.fullmatch(r'[^()]+ \(([^()]+)\)', label)
+            shortcut_index = -1
+            if m:
+                shortcut_index = m.start(1)
+                shortcuts = m.group(1)
+                for shortcut in shortcuts.split("/"):
+                    state, key = {
+                        "←": (0, "Left"),
+                        "→": (0, "Right"),
+                        "<": (1, "less"),
+                        ">": (1, "greater"),
+                        # Regular Enter key only.
+                        "⏎": (0, "Return"),
+                        " ": (0, "space"),
+                        # Shift-enter. Note, this still ends up adding a blank line in the transcription box
+                        "⇧⏎": (1, "Return"),
+                        "C-n": (4, "n"),
+                    }.get(shortcut, (None, shortcut))
+                    self.shortcuts[(state, key)] = actions
+            button = tk.Button(self.buttons_frame, text=label, underline=shortcut_index)
             button.grid(column=i, row=1)
             button.bind("<Button-1>", functools.partial(self._handle_button, actions))
+        #self.bind_all("<Key>", lambda event: print(event.keysym, event, event.state))
+
+    def handle_keypress(self, event):
+        state, key = event.state, event.keysym
+        actions = self.shortcuts.get((None, key))
+        actions = self.shortcuts.get((state, key), actions)
+        if actions is not None:
+            self._handle_button(actions, event)
 
     def _handle_button(self, actions, event):
         if not isinstance(actions, list):
@@ -194,6 +256,10 @@ class TranscriptionPhase(tk.Frame):
             except ButtonActionInvalidError as e:
                 tkmessagebox.showinfo(message=e.message)
                 return
+    
+    def refresh(self):
+        if self.current_image is not None:
+            self.set_image(*self._refresh_args)
 
     def __hash__(self):
         return hash(self.id)
@@ -202,8 +268,8 @@ class TranscriptionPhase(tk.Frame):
         return self.extras.get(e, Ignorer()) # Magic so we don't have to check for None
 
     def set_image(self, image, is_work, categories):
-        # TODO: For later phases, often changes get made but when you switch to that tab, they are not yet reflected for the first one.
         self.current_image = image
+        self._refresh_args = (image, is_work, categories)
         if self.current_image is None:
             self.sv_current_image_path.set("Complete")
             self.sv_current_image_name.set("Complete")

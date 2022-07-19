@@ -165,6 +165,7 @@ class Organizer():
 
     def set_image(self, phase, new_index):
         """Use if the selected image changed for a phase"""
+        old_index = self._phase_index[phase]
         self.set_phase_index(phase, new_index)
         tags, phase_index, images, work_images = self.phase_info(phase)
         if len(images) == 0 or new_index is None:
@@ -186,7 +187,11 @@ class Organizer():
         """Use if we think an image was changed externally"""
         for phase, tags, phase_index, images, work_images in self.phases():
             if len(images) > 0 and phase_index == image.index:
-                phase.set_image(image, phase_index in work_images)
+                phase.set_image(
+                    image,
+                    is_work=phase_index in work_images,
+                    categories=self.categories,
+                )
 
     def _switch_index(self, phase, offset, working_set):
         _, current_index, _, _ = self.phase_info(phase)
