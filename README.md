@@ -64,7 +64,7 @@ Printed documents are run through OCR. This isn't actually done yet, but it will
 ### Phase 5: Transcribing by hand
 ![Phase 5a: Transcribing by Hand](/screenshots/phase5.png)
 
-I write up all my handwritten documents. I have not found any useful handwriting recognition software. I just do it all by hand. For screenshot readability, the screenshot is actually of a printed document.
+I type up all my handwritten documents. I have not found any useful handwriting recognition software. I just type it all by hand. For screenshot readability, the screenshot is actually of a printed document.
 
 ### Phase 6: Verification
 ![Phase 6: Verification](/screenshots/phase6.png)
