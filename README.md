@@ -10,7 +10,7 @@ The input is some raw scans. They could be handwritten notes, printed computer d
 
 ![A movie ticket stub](/screenshots/sample_image.jpg)
 
-The final product is that for each file like `ticket.jpg`, we end up with `ticket.txt`. This has metadata about the file (tags, category, notes) and a transcription of any text in the image, to make it searchable.
+The final product is that for each file like `ticket.jpg`, one ends up with `ticket.txt`. This has metadata about the file (tags, category, notes) and a transcription of any text in the image, to make it searchable.
 
 ```
 ---
@@ -36,22 +36,22 @@ Rialto Cinemas Gift Cards
 Perfect For Movie Lovers!
 ```
 
-Here are some screenshots of the process.
+Here are some screenshots of my personal process.
 
 ### Phase 1: Rotating and Cropping
 ![Phase 1: Rotating and Cropping](/screenshots/phase1.png)
 
-First, we clean up the images. Crop them, rotate them if they're not facing the right way. You can rotate images with the buttons at the bottom, or with keyboard shortcuts. Once you're done, you press a button, and *scan-organizer* advanced to the next un-cleaned photo. At any point you're welcome to exit the program, and all progress is saved.
+First, I clean up the images. Crop them, rotate them if they're not facing the right way. I can rotate images with the buttons at the bottom, or with keyboard shortcuts. Once I'm done, I press a button, and *scan-organizer* advanced to the next un-cleaned photo. At any point, I can exit the program, and all progress is saved.
 
 ### Phase 2: Sorting into folders
 ![Phase 2: Sorting into folders](/screenshots/phase2.png)
 
-Next, we sort things into folders, or "categories". As you browse folders, you can preview what's already in that folder.
+Next, I sort things into folders, or "categories". As I browse folders, I can preview what's already in that folder.
 
 ### Phase 3: Renaming Images
 ![Phase 3: Renaming images](/screenshots/phase3.png)
 
-Renaming images comes next. For convenience, you can browse existing images in the folder, to help name everything in a standard way.
+Renaming images comes next. For convenience, I can browse existing images in the folder, to help name everything in a standard way.
 
 ### Phase 4: Tagging images
 ![Phase 4: Tagging images](/screenshots/phase4.png)
@@ -59,12 +59,12 @@ Renaming images comes next. For convenience, you can browse existing images in t
 I tag my images with the type of text. They might be handwritten. Or they might be printed computer documents. You can imagine extending the process with other types of tagging for your use case.
 
 ### Not done: OCR
-Printed documents are run through OCR. This isn't actually done yet, but it will be easy to plug in.
+Printed documents are run through OCR. This isn't actually done yet, but it will be easy to plug in. I'll use tesseract.
 
 ### Phase 5: Transcribing by hand
 ![Phase 5a: Transcribing by Hand](/screenshots/phase5.png)
 
-I write up all my handwritten documents. I have not found any useful handwriting recognition software. I just do it all by hand.
+I write up all my handwritten documents. I have not found any useful handwriting recognition software. I just do it all by hand. For screenshot readability, the screenshot is actually of a printed document.
 
 ### Phase 6: Verification
 ![Phase 6: Verification](/screenshots/phase6.png)
