@@ -39,22 +39,22 @@ Perfect For Movie Lovers!
 Here are some screenshots of the process.
 
 ### Phase 1: Rotating and Cropping
-![Phase 1: Rotating and Cropping](/screenshots/phase1.jpg)
+![Phase 1: Rotating and Cropping](/screenshots/phase1.png)
 
 First, we clean up the images. Crop them, rotate them if they're not facing the right way. You can rotate images with the buttons at the bottom, or with keyboard shortcuts. Once you're done, you press a button, and *scan-organizer* advanced to the next un-cleaned photo. At any point you're welcome to exit the program, and all progress is saved.
 
 ### Phase 2: Sorting into folders
-![Phase 2: Sorting into folders](/screenshots/phase2.jpg)
+![Phase 2: Sorting into folders](/screenshots/phase2.png)
 
 Next, we sort things into folders, or "categories". As you browse folders, you can preview what's already in that folder.
 
 ### Phase 3: Renaming Images
-![Phase 3: Renaming images](/screenshots/phase3.jpg)
+![Phase 3: Renaming images](/screenshots/phase3.png)
 
 Renaming images comes next. For convenience, you can browse existing images in the folder, to help name everything in a standard way.
 
 ### Phase 4: Tagging images
-![Phase 4: Tagging images](/screenshots/phase3.jpg)
+![Phase 4: Tagging images](/screenshots/phase3.png)
 
 I tag my images with the type of text. They might be handwritten. Or they might be printed computer documents. You can imagine extending the process with other types of tagging for your use case.
 
@@ -62,12 +62,12 @@ I tag my images with the type of text. They might be handwritten. Or they might 
 Printed documents are run through OCR. This isn't actually done yet, but it will be easy to plug in.
 
 ### Phase 5: Transcribing by hand
-![Phase 5a: Transcribing by Hand](/screenshots/phase3.jpg)
+![Phase 5a: Transcribing by Hand](/screenshots/phase3.png)
 
 I write up all my handwritten documents. I have not found any useful handwriting recognition software. I just do it all by hand.
 
 ### Phase 6: Verification
-![Phase 6: Verification](/screenshots/phase3.jpg)
+![Phase 6: Verification](/screenshots/phase3.png)
 At the end of the whole process, I verify that each image looks good, is correctly tagged and transcribed, and so on.
 
 ## Alternatives
