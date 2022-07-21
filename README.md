@@ -54,7 +54,7 @@ Next, we sort things into folders, or "categories". As you browse folders, you c
 Renaming images comes next. For convenience, you can browse existing images in the folder, to help name everything in a standard way.
 
 ### Phase 4: Tagging images
-![Phase 4: Tagging images](/screenshots/phase3.png)
+![Phase 4: Tagging images](/screenshots/phase4.png)
 
 I tag my images with the type of text. They might be handwritten. Or they might be printed computer documents. You can imagine extending the process with other types of tagging for your use case.
 
@@ -62,12 +62,12 @@ I tag my images with the type of text. They might be handwritten. Or they might 
 Printed documents are run through OCR. This isn't actually done yet, but it will be easy to plug in.
 
 ### Phase 5: Transcribing by hand
-![Phase 5a: Transcribing by Hand](/screenshots/phase3.png)
+![Phase 5a: Transcribing by Hand](/screenshots/phase5.png)
 
 I write up all my handwritten documents. I have not found any useful handwriting recognition software. I just do it all by hand.
 
 ### Phase 6: Verification
-![Phase 6: Verification](/screenshots/phase3.png)
+![Phase 6: Verification](/screenshots/phase6.png)
 At the end of the whole process, I verify that each image looks good, is correctly tagged and transcribed, and so on.
 
 ## Alternatives
