@@ -37,7 +37,7 @@ class OrganizerImage():
             self.textfm['tags'] = []
 
     def rename(self, new_name):
-        self._move(self.image_path.parent.joinpath(new_name))
+        self._move(self.image_path.parent.joinpath(new_name + self.image_path.suffix.lower()))
 
     def set_category(self, category):
         self.category = category
@@ -55,6 +55,11 @@ class OrganizerImage():
     def transcription(self, content):
         self.textfm.content = content
         self._save_text()
+
+    def delete(self):
+        self.tag("+deleted")
+        self.image_path.unlink()
+        self.transcription_path.unlink(missing_ok=True)
 
     @property
     def tags(self):
@@ -198,8 +203,21 @@ class Organizer():
         if len(working_set) == 0:
             new_index = None
         else:
-            # Next image. Assumes we're on one. Should fix that, eventually
-            assert current_index in working_set
+            if current_index not in working_set:
+                if offset > 0:
+                    offset -= 1
+                    # Find next image in working set
+                    try:
+                        current_index = min(x for x in working_set if x > current_index)
+                    except ValueError:
+                        current_index = min(working_set)
+                else:
+                    offset -= 1
+                    # Find prev image in working set
+                    try:
+                        current_index = max(x for x in working_set if x < current_index)
+                    except ValueError:
+                        current_index = max(working_set)
             work_index = working_set.index(current_index)
             next_work_index = (work_index + offset) % len(working_set)
             new_index = working_set[next_work_index]
@@ -242,6 +260,23 @@ class Organizer():
     def prev_work(self, phase, image):
         _, _, _, work_images = self.phase_info(phase)
         return self._switch_index(phase, -1, work_images)
+
+    def delete(self, phase, image):
+        for phase, tags, phase_index, images, work_images in self.phases():
+            if phase_index == image.index:
+                self.next_work(phase, image)
+
+            if image.index in work_images:
+                phase.increment_todo(-1)
+            else:
+                phase.increment_finished(-1)
+
+            if image.index in work_images:
+                work_images.remove(image.index)
+            if image.index in images:
+                images.remove(image.index)
+
+        image.delete()
 
     def tag(self, tag): # A button's action should be self.tag("+some_tag")
         return lambda phase, image: self._tag(tag, phase, image) 

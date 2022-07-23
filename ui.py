@@ -232,6 +232,7 @@ class TranscriptionPhase(tk.Frame):
                         " ": (0, "space"),
                         # Shift-enter. Note, this still ends up adding a blank line in the transcription box
                         "⇧⏎": (1, "Return"),
+                        "del": (0, "Delete"),
                         "C-n": (4, "n"),
                     }.get(shortcut, (None, shortcut))
                     self.shortcuts[(state, key)] = actions
@@ -282,10 +283,10 @@ class TranscriptionPhase(tk.Frame):
         else:
             self.image_canvas.set(self.current_image.image_path)
             self.sv_current_image_path.set(str(self.current_image.image_path))
-            self.sv_current_image_name.set(self.current_image.image_path.name)
+            self.sv_current_image_name.set(self.current_image.image_path)
             self.get_extra(Extras.CATEGORY_PICKER).set_category(image.category, categories)
             self.get_extra(Extras.METADATA_DISPLAY).set_metadata(image.metadata_string)
-            self.get_extra(Extras.RENAME).set_name(image.image_path.name)
+            self.get_extra(Extras.RENAME).set_name(image.image_path.name.stem)
             self.get_extra(Extras.SHOW_CATEGORY).set_category(image.category)
             self.get_extra(Extras.TRANSCRIBE).set_transcription(image.transcription)
 
