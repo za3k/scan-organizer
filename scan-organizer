@@ -135,7 +135,7 @@ class ScanOrganizer(Organizer):
             self.reload_image(image)
 
 if __name__ == "__main__":
-    args = sys.argv[
+    args = sys.argv[1:]
     p_args = []
     kw_args = {}
     AVAILABLE_ARGS = { "--bulk-tags": 1 }
@@ -145,15 +145,15 @@ if __name__ == "__main__":
             nargs = AVAILABLE_ARGS[arg]
             value, args = args[:nargs], args[nargs:]
             kw_args[arg] = value
-        elif arg.startswith("-")
+        elif arg.startswith("-"):
             print("Unknown argument: {}".format(arg)); sys.exit(1)
         else:
-            p_args.append(args[0]
+            p_args.append(arg)
 
     if len(p_args) == 0:
         print("Specify the scan folder, please"); sys.exit(1)
     if len(p_args) == 1:
-        master = pathlib.Path(os.getcwd())
+        master = pathlib.Path(p_args[0])
         if not master.is_dir():
             print("Path must be a directory: ", master); sys.exit(1)
         organizer = ScanOrganizer(master)

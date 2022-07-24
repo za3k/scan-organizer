@@ -286,7 +286,7 @@ class TranscriptionPhase(tk.Frame):
             self.sv_current_image_name.set(self.current_image.image_path)
             self.get_extra(Extras.CATEGORY_PICKER).set_category(image.category, categories)
             self.get_extra(Extras.METADATA_DISPLAY).set_metadata(image.metadata_string)
-            self.get_extra(Extras.RENAME).set_name(image.image_path.name.stem)
+            self.get_extra(Extras.RENAME).set_name(image.image_path.stem)
             self.get_extra(Extras.SHOW_CATEGORY).set_category(image.category)
             self.get_extra(Extras.TRANSCRIBE).set_transcription(image.transcription)
 
