@@ -120,7 +120,7 @@ class TranscriptionWindow(tk.Tk):
 
 
 class TranscriptionPhase(tk.Frame):
-    def __init__(self, root, name, extras, buttons, on_create_category):
+    def __init__(self, root, name, extras, buttons, on_create_category, on_rename_category):
         super().__init__(root)
         self.id = name
         self.image = None
@@ -195,7 +195,7 @@ class TranscriptionPhase(tk.Frame):
         self.extras_frame.grid_rowconfigure(1, weight=1)
         for i, extra_request in enumerate(extras):
             if extra_request == Extras.CATEGORY_PICKER:
-                extra = ExtraCategoryPicker(self.extras_frame, on_create_category)
+                extra = ExtraCategoryPicker(self.extras_frame, on_create_category, on_rename_category)
             elif extra_request == Extras.METADATA_DISPLAY:
                 extra = ExtraMetadataDisplay(self.extras_frame)
             elif extra_request == Extras.SHOW_CATEGORY:
@@ -329,7 +329,7 @@ class ExtraCategoryPicker(tk.Frame, Extra):
 
     Does not save choice automatically.
     """
-    def __init__(self, root, category_creator):
+    def __init__(self, root, category_creator, category_renamer):
         super().__init__(root)
 
         self.SHORTCUTS = "123456789"
@@ -338,7 +338,9 @@ class ExtraCategoryPicker(tk.Frame, Extra):
         self.sv_new_category = tk.StringVar(value="")
         self._categories = []
         self.category_creator = category_creator
+        self.category_renamer = category_renamer
         assert category_creator is not None
+        assert category_renamer is not None
 
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(1, weight=1)
@@ -353,6 +355,9 @@ class ExtraCategoryPicker(tk.Frame, Extra):
         self.add_category_button = tk.Button(self, text="Add New")
         self.add_category_button.grid(column=2, row=2)
         self.add_category_button.bind("<Button-1>", self.on_create_category)
+        self.rename_category_button = tk.Button(self, text="Rename")
+        self.rename_category_button.grid(column=3, row=2)
+        self.rename_category_button.bind("<Button-1>", self.on_rename_category)
         for key in self.SHORTCUTS:
             self.listbox.bind(key, self.on_keystroke)
 
@@ -400,6 +405,7 @@ class ExtraCategoryPicker(tk.Frame, Extra):
         selected_category = self.selected_category
         # If the category is unset, don't reset the textbox
         if selected_category is not None:
+            self._last_selected_category = selected_category
             filenames = [file.name for file in selected_category.path.iterdir() if file.suffix != ".txt"]
             self.filenames.set(natsort.natsorted(filenames))
             self.sv_new_category.set(selected_category.name)
@@ -421,6 +427,20 @@ class ExtraCategoryPicker(tk.Frame, Extra):
         except ButtonActionInvalidError as e:
             tkmessagebox.showinfo(message=e.message)
 
+    def on_rename_category(self, event):
+        category_old = self._last_selected_category
+        new_category_name = self.sv_new_category.get().strip()
+        if new_category_name == "":
+            tkmessagebox.showinfo(message="You must type a category name")
+            return
+        elif category_old.name == new_category_name == "":
+            tkmessagebox.showinfo(message="You must change the category name")
+            return
+        try:
+            args = self.category_renamer(category_old, new_category_name)
+            self.set_category(*args)
+        except ButtonActionInvalidError as e:
+            tkmessagebox.showinfo(message=e.message)
 
 
 class ExtraMetadataDisplay(tk.Text, Extra):

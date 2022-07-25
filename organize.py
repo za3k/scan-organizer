@@ -35,6 +35,15 @@ class OrganizerCategory():
     def __init__(self, path, name):
         self.path = path
         self.name = name
+    def rename(self, new_path, new_name):
+        if new_path.exists():
+            raise ImageClobberingError()
+        old_path = self.path
+        os.mkdir(new_path)
+        os.rmdir(old_path)
+        self.path = new_path
+        self.name = new_name
+        return self
 
 
 class OrganizerImage():
@@ -139,7 +148,7 @@ class Organizer():
         self._phase_index = collections.defaultdict(lambda: None)
 
     def add_phase(self, tags, **kwargs):
-        phase = self.window.add_phase(on_create_category=self.on_create_category, **kwargs)
+        phase = self.window.add_phase(on_create_category=self.on_create_category, on_rename_category=self.on_rename_category, **kwargs)
         self._phases.append(phase)
         self._phase_tags[phase] = tags
         # Images are always added after phases, so skip iterating over existing images
@@ -258,6 +267,13 @@ class Organizer():
             raise ui.ButtonActionInvalidError("That category already exists")
         self.categories.append(category)
         return category, self.categories, self.recent_categories
+
+    def on_rename_category(self, old_category, new_name):
+        new_category = old_category.rename(self.new_category_root.joinpath(new_name), new_name)
+        for image in self.images:
+            if image.category == old_category:
+                image.set_category(new_category)
+        return new_category, self.categories, self.recent_categories
 
 
     # Common (model-level) buttons
