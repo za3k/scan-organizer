@@ -18,6 +18,19 @@ class ImageClobberingError(ui.ButtonActionInvalidError):
         super().__init__("Image already exists")
 
 
+class RecencyQueue():
+    def __init__(self, size):
+        self.size = size
+        self.list = []
+    def add(self, item):
+        if item in self.list:
+            self.list.remove(item)
+        self.list = [item] + self.list
+        self.list = self.list[:self.size]
+    def __iter__(self):
+        return iter(self.list)
+
+
 class OrganizerCategory():
     def __init__(self, path, name):
         self.path = path
@@ -107,6 +120,7 @@ class OrganizerImage():
     def _transcription_path(self, image_path):
         return image_path.parent.joinpath(image_path.stem + ".txt")
 
+
 class Organizer():
     def __init__(self, new_category_root):
         self.window = ui.TranscriptionWindow()
@@ -114,6 +128,7 @@ class Organizer():
         self.images = []
         self.categories = []
         self._phases = []
+        self.recent_categories = RecencyQueue(5)
         # phase -> All images for that phase, at least those unfinished at the program start. As indices
         self._phase_images = collections.defaultdict(list)
         # phase -> Images still requiring work. As indices
@@ -186,6 +201,7 @@ class Organizer():
                 image,
                 is_work=phase_index in work_images,
                 categories=self.categories,
+                recent_categories=self.recent_categories,
             )
 
     def reload_image(self, image):
@@ -241,7 +257,7 @@ class Organizer():
         except FileExistsError:
             raise ui.ButtonActionInvalidError("That category already exists")
         self.categories.append(category)
-        return category, self.categories
+        return category, self.categories, self.recent_categories
 
 
     # Common (model-level) buttons
@@ -314,11 +330,11 @@ class Organizer():
 
     # Default extras (UI-level) buttons
     def save_category(self, phase, image):
-        category_name = phase.get_extra(Extras.CATEGORY_PICKER).get_category_name()
-        if category_name is None:
+        category = phase.get_extra(Extras.CATEGORY_PICKER).get_category()
+        if category is None:
             raise SaveInvalidError("Category not selected")
-        category = [category for category in self.categories if category.name == category_name][0]
         image.set_category(category)
+        self.recent_categories.add(category)
 
     def save_name(self, phase, image):
         name = phase.get_extra(Extras.RENAME).get_name()

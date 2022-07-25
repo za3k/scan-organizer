@@ -268,9 +268,9 @@ class TranscriptionPhase(tk.Frame):
     def get_extra(self, e):
         return self.extras.get(e, Ignorer()) # Magic so we don't have to check for None
 
-    def set_image(self, image, is_work, categories):
+    def set_image(self, image, is_work, categories, recent_categories):
         self.current_image = image
-        self._refresh_args = (image, is_work, categories)
+        self._refresh_args = (image, is_work, categories, recent_categories)
         if self.current_image is None:
             self.sv_current_image_path.set("Complete")
             self.sv_current_image_name.set("Complete")
@@ -284,7 +284,7 @@ class TranscriptionPhase(tk.Frame):
             self.image_canvas.set(self.current_image.image_path)
             self.sv_current_image_path.set(str(self.current_image.image_path))
             self.sv_current_image_name.set(self.current_image.image_path)
-            self.get_extra(Extras.CATEGORY_PICKER).set_category(image.category, categories)
+            self.get_extra(Extras.CATEGORY_PICKER).set_category(image.category, categories, recent_categories)
             self.get_extra(Extras.METADATA_DISPLAY).set_metadata(image.metadata_string)
             self.get_extra(Extras.RENAME).set_name(image.image_path.stem)
             self.get_extra(Extras.SHOW_CATEGORY).set_category(image.category)
@@ -332,6 +332,7 @@ class ExtraCategoryPicker(tk.Frame, Extra):
     def __init__(self, root, category_creator):
         super().__init__(root)
 
+        self.SHORTCUTS = "123456789"
         self.choices = tk.StringVar(value=[])
         self.filenames = tk.StringVar(value=[])
         self.sv_new_category = tk.StringVar(value="")
@@ -352,21 +353,44 @@ class ExtraCategoryPicker(tk.Frame, Extra):
         self.add_category_button = tk.Button(self, text="Add New")
         self.add_category_button.grid(column=2, row=2)
         self.add_category_button.bind("<Button-1>", self.on_create_category)
+        for key in self.SHORTCUTS:
+            self.listbox.bind(key, self.on_keystroke)
 
-    def set_category(self, category, categories):
-        _categories = natsort.natsorted([(category.name, category) for category in categories])
-        self._categories = [x[1] for x in _categories]
-        self.choices.set([x[0] for x in _categories])
+    def on_keystroke(self, event):
+        state, key = event.state, event.keysym
+        if state != 0:
+            return
+        if key not in self.shortcuts:
+            return
+        category = self.shortcuts[key]
+        self.set_category(category, self._categories, self._recent_categories)
+
+    def set_category(self, active_category, categories, recent_categories):
+        self._recent_categories = [x for x in recent_categories]
+        _categories = natsort.natsorted([(category not in self._recent_categories, category.name, category) for category in categories])
+        self.shortcuts = {}
+        self._categories = []
+        choices = []
+        for i, (not_recent, category_name, category) in enumerate(_categories):
+            is_recent = not not_recent
+            self._categories.append(category)
+            if is_recent:
+                self.shortcuts[self.SHORTCUTS[i]] = category
+                choices.append("({}) {}".format(self.SHORTCUTS[i], category_name))
+            else:
+                choices.append(category_name)
+        self.choices.set(choices)
 
         self.listbox.select_clear(0, "end")
-        if category is not None:
-            index = self._categories.index(category)
+        if active_category is not None:
+            index = self._categories.index(active_category)
             self.listbox.selection_set((index,))
         self.on_category_changed()
 
-    def get_category_name(self):
+    def get_category(self):
         if len(self.listbox.curselection()) == 1:
-            return self.listbox.get(self.listbox.curselection())
+            index = self.listbox.curselection()[0]
+            return self._categories[index]
 
     def on_selection_change(self, event):
         self.on_category_changed()
@@ -392,8 +416,8 @@ class ExtraCategoryPicker(tk.Frame, Extra):
             tkmessagebox.showinfo(message="You must type a category name")
             return
         try:
-            new_category, categories = self.category_creator(category_name)
-            self.set_category(new_category, categories)
+            args = self.category_creator(category_name)
+            self.set_category(*args)
         except ButtonActionInvalidError as e:
             tkmessagebox.showinfo(message=e.message)
 
