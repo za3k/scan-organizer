@@ -39,8 +39,7 @@ class OrganizerCategory():
         if new_path.exists():
             raise ImageClobberingError()
         old_path = self.path
-        os.mkdir(new_path)
-        os.rmdir(old_path)
+        os.rename(old_path, new_path)
         self.path = new_path
         self.name = new_name
         return self
@@ -61,9 +60,14 @@ class OrganizerImage():
     def rename(self, new_name):
         self._move(self.image_path.parent.joinpath(new_name + self.image_path.suffix.lower()))
 
-    def set_category(self, category):
+    def set_category(self, category, move=True):
         self.category = category
-        self._move(category.path.joinpath(self.image_path.name))
+        new_path = category.path.joinpath(self.image_path.name)
+        if move:
+            self._move(new_path)
+        else:
+            self.image_path = new_path
+            self.transcription_path = self._transcription_path(new_path)
 
     @property
     def metadata_string(self):
@@ -272,7 +276,7 @@ class Organizer():
         new_category = old_category.rename(self.new_category_root.joinpath(new_name), new_name)
         for image in self.images:
             if image.category == old_category:
-                image.set_category(new_category)
+                image.set_category(new_category, move=False)
         return new_category, self.categories, self.recent_categories
 
 

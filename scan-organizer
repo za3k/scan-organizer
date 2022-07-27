@@ -92,7 +92,7 @@ class ScanOrganizer(Organizer):
             },
         )
 
-    def load_master(self, master):
+    def load_master(self, master, recursive=True):
         files = []
         dirs = [master]
         for p in dirs:
@@ -100,17 +100,22 @@ class ScanOrganizer(Organizer):
             for x in p.iterdir():
                 if x.is_file():
                     files.append(x)
-                elif x.is_dir():
+                elif x.is_dir() and recursive:
                     dirs.append(x)
 
-        for category in natsort.natsorted(dirs):
+        for category in natsort.natsorted(dirs, key=str):
             if category == master:
                 continue
             organizer.add_category(category, str(category.relative_to(master)))
-        for file in natsort.natsorted(files):
+        for file in natsort.natsorted(files, key=str):
             if file.suffix.lower() in {".png", ".jpg", ".jpeg", ".gif"}:
                 organizer.add_image(file)
         organizer.autoselect_phase()
+
+    def tag_all(self, tags):
+        for image in self.images:
+            for tag in tags:
+                image.tag(tag)
 
     def _run(self, command):
         """Run an external command"""
@@ -157,12 +162,13 @@ if __name__ == "__main__":
         if not master.is_dir():
             print("Path must be a directory: ", master); sys.exit(1)
         organizer = ScanOrganizer(master)
-        organizer.load_master(master)
     elif len(p_args) >= 2:
         print("Too many paths"); sys.exit(1)
 
     if "--bulk-tags" in kw_args:
-        tags = kw_args["--bulk_tags"]
+        organizer.load_master(master, recursive=False)
+        tags = kw_args["--bulk-tags"]
         organizer.tag_all(tags)
     else:
+        organizer.load_master(master)
         organizer.display()
