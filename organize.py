@@ -87,6 +87,10 @@ class OrganizerImage():
         self.image_path.unlink()
         self.transcription_path.unlink(missing_ok=True)
 
+    def delete_metadata(self):
+        self.tag("+deleted")
+        self.transcription_path.unlink(missing_ok=True)
+
     @property
     def tags(self):
         return self.textfm['tags']
@@ -141,7 +145,7 @@ class Organizer():
         self.images = []
         self.categories = []
         self._phases = []
-        self.recent_categories = RecencyQueue(5)
+        self.recent_categories = RecencyQueue(10)
         # phase -> All images for that phase, at least those unfinished at the program start. As indices
         self._phase_images = collections.defaultdict(list)
         # phase -> Images still requiring work. As indices
@@ -152,7 +156,9 @@ class Organizer():
         self._phase_index = collections.defaultdict(lambda: None)
 
     def add_phase(self, tags, **kwargs):
-        phase = self.window.add_phase(on_create_category=self.on_create_category, on_rename_category=self.on_rename_category, **kwargs)
+        phase = self.window.add_phase(get_categories=self.get_categories, **kwargs)
+        phase.get_extra(Extras.CATEGORY_PICKER).on("create_category", self.on_create_category)
+        phase.get_extra(Extras.CATEGORY_PICKER).on("rename_category", self.on_rename_category)
         self._phases.append(phase)
         self._phase_tags[phase] = tags
         # Images are always added after phases, so skip iterating over existing images
@@ -270,15 +276,17 @@ class Organizer():
         except FileExistsError:
             raise ui.ButtonActionInvalidError("That category already exists")
         self.categories.append(category)
-        return category, self.categories, self.recent_categories
 
     def on_rename_category(self, old_category, new_name):
         new_category = old_category.rename(self.new_category_root.joinpath(new_name), new_name)
         for image in self.images:
             if image.category == old_category:
                 image.set_category(new_category, move=False)
-        return new_category, self.categories, self.recent_categories
 
+    def get_categories(self, category_name):
+        for cat in self.categories:
+            if cat.name == category_name:
+                return self.categories, self.recent_categories
 
     # Common (model-level) buttons
     def next(self, phase, image):
@@ -297,7 +305,7 @@ class Organizer():
         _, _, _, work_images = self.phase_info(phase)
         return self._switch_index(phase, -1, work_images)
 
-    def delete(self, phase, image):
+    def delete(self, phase, image, metadata_only=False):
         for phase, tags, phase_index, images, work_images in self.phases():
             if phase_index == image.index:
                 self.next_work(phase, image)
@@ -312,7 +320,13 @@ class Organizer():
             if image.index in images:
                 images.remove(image.index)
 
-        image.delete()
+        if metadata_only:
+            image.delete_metadata()
+        else:
+            image.delete()
+
+    def delete_metadata(self, phase, image):
+        self.delete(phase, image, metadata_only=True)
 
     def tag(self, tag): # A button's action should be self.tag("+some_tag")
         return lambda phase, image: self._tag(tag, phase, image) 

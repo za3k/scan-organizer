@@ -43,6 +43,8 @@ class ScanOrganizer(Organizer):
             buttons={
                 "Skip Prev (←)": self.prev,
                 "Skip Next (→)": self.next,
+                "Crop (~)": self.crop,
+                "Delete (del)": self.delete,
                 "Categorize (n)": [self.save_category, self.tag("+categorized")],
             },
         )
@@ -53,6 +55,8 @@ class ScanOrganizer(Organizer):
             buttons={
                 "Skip Prev (←)": self.prev,
                 "Skip Next (→)": self.next,
+                "Delete (del)": self.delete,
+                "Start Over (s)": self.delete_metadata,
                 "Rename (n)": [self.save_name, self.tag("+named")],
             },
         )
@@ -106,7 +110,8 @@ class ScanOrganizer(Organizer):
         for category in natsort.natsorted(dirs, key=str):
             if category == master:
                 continue
-            organizer.add_category(category, str(category.relative_to(master)))
+            if "unsorted" not in str(category):
+                organizer.add_category(category, str(category.relative_to(master)))
         for file in natsort.natsorted(files, key=str):
             if file.suffix.lower() in {".png", ".jpg", ".jpeg", ".gif"}:
                 organizer.add_image(file)
@@ -143,6 +148,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     p_args = []
     kw_args = {}
+    # TODO: Delete orphaned .txt files, delete empty folders, fix 'category' tag in text part
     AVAILABLE_ARGS = { "--bulk-tags": 1 }
     while len(args) > 0:
         arg, args = args[0], args[1:]

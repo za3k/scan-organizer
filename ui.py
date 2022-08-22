@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import collections
 import enum
 import functools
 import re
@@ -23,6 +24,17 @@ class Extras(enum.Enum):
     RENAME = "rename"
     SHOW_CATEGORY = "show_category"
     TRANSCRIBE = "transcribe"
+
+
+class EventHaver():
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._handlers = collections.defaultdict(list)
+    def on(self, event, handler):
+        self._handlers[event].append(handler)
+    def event(self, event, *args, **kwargs):
+        for handler in self._handlers[event]:
+            handler(*args, **kwargs)
 
 
 class Ignorer():
@@ -120,7 +132,7 @@ class TranscriptionWindow(tk.Tk):
 
 
 class TranscriptionPhase(tk.Frame):
-    def __init__(self, root, name, extras, buttons, on_create_category, on_rename_category):
+    def __init__(self, root, name, extras, buttons, get_categories=None):
         super().__init__(root)
         self.id = name
         self.image = None
@@ -195,7 +207,7 @@ class TranscriptionPhase(tk.Frame):
         self.extras_frame.grid_rowconfigure(1, weight=1)
         for i, extra_request in enumerate(extras):
             if extra_request == Extras.CATEGORY_PICKER:
-                extra = ExtraCategoryPicker(self.extras_frame, on_create_category, on_rename_category)
+                extra = ExtraCategoryPicker(self.extras_frame, get_categories=get_categories)
             elif extra_request == Extras.METADATA_DISPLAY:
                 extra = ExtraMetadataDisplay(self.extras_frame)
             elif extra_request == Extras.SHOW_CATEGORY:
@@ -209,6 +221,8 @@ class TranscriptionPhase(tk.Frame):
             self.extras[extra_request] = extra
             #self.extras_frame.grid_columnconfigure(i, weight=1)
             extra.grid(column=i, row=1, sticky=extra.get_sticky())
+        #self.get_extra(Extras.RENAME).set_name(filename)
+        self.get_extra(Extras.SHOW_CATEGORY).on("click_file", self.on_click_file)
             
         # +---------------------------------------------------+
         # | save | left | right | crop | prev | next          |
@@ -240,6 +254,9 @@ class TranscriptionPhase(tk.Frame):
             button.grid(column=i, row=1)
             button.bind("<Button-1>", functools.partial(self._handle_button, actions))
         #self.bind_all("<Key>", lambda event: print(event.keysym, event, event.state))
+
+    def on_click_file(self, filename):
+        self.get_extra(Extras.RENAME).set_name(filename)
 
     def handle_keypress(self, event):
         state, key = event.state, event.keysym
@@ -284,7 +301,7 @@ class TranscriptionPhase(tk.Frame):
             self.image_canvas.set(self.current_image.image_path)
             self.sv_current_image_path.set(str(self.current_image.image_path))
             self.sv_current_image_name.set(self.current_image.image_path)
-            self.get_extra(Extras.CATEGORY_PICKER).set_category(image.category, categories, recent_categories)
+            self.get_extra(Extras.CATEGORY_PICKER).set_category(image.category, categories, recent_categories, image.category is not None)
             self.get_extra(Extras.METADATA_DISPLAY).set_metadata(image.metadata_string)
             self.get_extra(Extras.RENAME).set_name(image.image_path.stem)
             self.get_extra(Extras.SHOW_CATEGORY).set_category(image.category)
@@ -320,7 +337,8 @@ class Extra():
     def get_sticky(self):
         return tk.W+tk.N+tk.E+tk.S
 
-class ExtraCategoryPicker(tk.Frame, Extra):
+
+class ExtraCategoryPicker(tk.Frame, Extra, EventHaver):
     """Category picker.
 
     Displays a list of possible categories, and allows selecting one.
@@ -329,18 +347,15 @@ class ExtraCategoryPicker(tk.Frame, Extra):
 
     Does not save choice automatically.
     """
-    def __init__(self, root, category_creator, category_renamer):
-        super().__init__(root)
+    def __init__(self, root, get_categories):
+        tk.Frame.__init__(self, root)
+        EventHaver.__init__(self)
 
-        self.SHORTCUTS = "123456789"
+        self.SHORTCUTS = "1234567890"
         self.choices = tk.StringVar(value=[])
         self.filenames = tk.StringVar(value=[])
         self.sv_new_category = tk.StringVar(value="")
         self._categories = []
-        self.category_creator = category_creator
-        self.category_renamer = category_renamer
-        assert category_creator is not None
-        assert category_renamer is not None
 
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(1, weight=1)
@@ -369,8 +384,9 @@ class ExtraCategoryPicker(tk.Frame, Extra):
             return
         category = self.shortcuts[key]
         self.set_category(category, self._categories, self._recent_categories)
+        self.listbox.xview_moveto(0)
 
-    def set_category(self, active_category, categories, recent_categories):
+    def set_category(self, active_category, categories, recent_categories, show=True):
         self._recent_categories = [x for x in recent_categories]
         _categories = natsort.natsorted([(category not in self._recent_categories, category.name, category) for category in categories])
         self.shortcuts = {}
@@ -390,6 +406,8 @@ class ExtraCategoryPicker(tk.Frame, Extra):
         if active_category is not None:
             index = self._categories.index(active_category)
             self.listbox.selection_set((index,))
+            if show:
+                self.listbox.see(index)
         self.on_category_changed()
 
     def get_category(self):
@@ -422,8 +440,8 @@ class ExtraCategoryPicker(tk.Frame, Extra):
             tkmessagebox.showinfo(message="You must type a category name")
             return
         try:
-            args = self.category_creator(category_name)
-            self.set_category(*args)
+            self.event("create_category", category_name)
+            self.set_category(*self.get_categoroes(category_name))
         except ButtonActionInvalidError as e:
             tkmessagebox.showinfo(message=e.message)
 
@@ -437,8 +455,8 @@ class ExtraCategoryPicker(tk.Frame, Extra):
             tkmessagebox.showinfo(message="You must change the category name")
             return
         try:
-            args = self.category_renamer(category_old, new_category_name)
-            self.set_category(*args)
+            self.event("rename_category", category_old, new_category_name)
+            self.set_category(*self.get_categories(new_category_name))
         except ButtonActionInvalidError as e:
             tkmessagebox.showinfo(message=e.message)
 
@@ -456,17 +474,19 @@ class ExtraMetadataDisplay(tk.Text, Extra):
         self.config(state=tk.DISABLED)
 
 
-class ExtraShowCategory(tk.Frame, Extra):
+class ExtraShowCategory(tk.Frame, Extra, EventHaver):
     """Display the current category and files in it"""
     def __init__(self, root):
         super().__init__(root)
+        EventHaver.__init__(self)
         self.rowconfigure(2, weight=1)
         self.filenames = tk.StringVar(value=[])
         self.sv_category = tk.StringVar(value="Loading...")
         self.label = tk.Label(self, textvariable=self.sv_category)
-        self.listbox = tk.Listbox(self, listvariable=self.filenames, state=tk.DISABLED)
+        self.listbox = tk.Listbox(self, listvariable=self.filenames)#, state=tk.DISABLED)
         self.label.grid(column=1, row=1, sticky=tk.W+tk.E)
         self.listbox.grid(column=1, row=2, sticky=tk.W+tk.N+tk.E+tk.S)
+        self.listbox.bind("<<ListboxSelect>>", self.click_file)
 
     def set_category(self, category):
         self.sv_category.set(category.name if category is not None else "")
@@ -475,6 +495,11 @@ class ExtraShowCategory(tk.Frame, Extra):
         if category is not None:
             filenames = [file.name for file in category.path.iterdir() if file.suffix != ".txt"]
             self.filenames.set(natsort.natsorted(filenames))
+
+    def click_file(self, event):
+        selected_index, = self.listbox.curselection()
+        filename = self.listbox.get(selected_index)
+        self.event("click_file", filename)
 
 
 class ExtraRename(tk.Frame, Extra):
