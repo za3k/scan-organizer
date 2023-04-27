@@ -209,7 +209,7 @@ class Organizer():
         tags, phase_index, images, work_images = self.phase_info(phase)
         if len(images) == 0 or new_index is None:
             assert new_index is None
-            phase.set_image(None, False, [])
+            phase.set_image(None, False, [], recent_categories=self.recent_categories)
             phase.set_done(True)
         else:
             assert new_index is not None
@@ -231,6 +231,7 @@ class Organizer():
                     image,
                     is_work=phase_index in work_images,
                     categories=self.categories,
+                    recent_categories=self.recent_categories,
                 )
 
     def _switch_index(self, phase, offset, working_set):

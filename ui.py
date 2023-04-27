@@ -2,6 +2,7 @@
 import collections
 import enum
 import functools
+import os.path
 import re
 
 import natsort
@@ -256,7 +257,7 @@ class TranscriptionPhase(tk.Frame):
         #self.bind_all("<Key>", lambda event: print(event.keysym, event, event.state))
 
     def on_click_file(self, filename):
-        self.get_extra(Extras.RENAME).set_name(filename)
+        self.get_extra(Extras.RENAME).set_name(os.path.splitext(filename)[0])
 
     def handle_keypress(self, event):
         state, key = event.state, event.keysym
@@ -292,7 +293,7 @@ class TranscriptionPhase(tk.Frame):
             self.sv_current_image_path.set("Complete")
             self.sv_current_image_name.set("Complete")
             self.image_canvas.set(None)
-            self.get_extra(Extras.CATEGORY_PICKER).set_category(None, categories)
+            self.get_extra(Extras.CATEGORY_PICKER).set_category(None, categories, recent_categories, False)
             self.get_extra(Extras.METADATA_DISPLAY).set_metadata("")
             self.get_extra(Extras.RENAME).set_name("")
             self.get_extra(Extras.SHOW_CATEGORY).set_category(None)
@@ -321,7 +322,7 @@ class TranscriptionPhase(tk.Frame):
 
     def set_done(self, done, popup=False):
         if done:
-            self.set_image(None, False, [])
+            self.set_image(None, False, [], [])
             if popup:
                 tkmessagebox.showinfo(message="{} complete".format(self.id))
 
@@ -441,7 +442,7 @@ class ExtraCategoryPicker(tk.Frame, Extra, EventHaver):
             return
         try:
             self.event("create_category", category_name)
-            self.set_category(*self.get_categoroes(category_name))
+            self.set_category(*self.get_categories(category_name))
         except ButtonActionInvalidError as e:
             tkmessagebox.showinfo(message=e.message)
 
